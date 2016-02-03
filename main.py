@@ -26,19 +26,22 @@ class Spider(object):
         text (str): 爬取网页的html代码
     """
     def __init__(self, url, save_path):
-        self.text = urlopen(url).read()
+        try:
+            self.text = urlopen(url).read()
+        except URLError as e:
+            print(e)
         self.base_url = url
-        self.id = 0
-        self.err_no = 0
-        self.success_no = 0
         self.save_path = save_path
 
     def start(self):
-        """以当前时间为名创建文件夹，存储静态文件以及html。
+        """以当前时间为名创建文件夹，如果此文件夹已存在则删除该文件夹。并启动程序开始抓取网页资源。
         
         Returns:
-            dict: 成功的个数，失败的个数以及失败的url列表
+            dict: 成功下载的资源数，失败的资源数数以及失败的url列表
         """
+        self.id = 0
+        self.err_no = 0
+        self.success_no = 0
         self.err_list = []
         folder_name = '{:%y%m%d%H%M%S}'.format(datetime.datetime.now())
         folder_name = os.path.join(self.save_path, folder_name)
@@ -56,10 +59,11 @@ class Spider(object):
             'jpg': img_folder,
             'png': img_folder,
             'gif': img_folder,
+            'ico': img_folder,
             'css': os.path.join(folder_name, 'style'),
             'js': os.path.join(folder_name, 'js')
         }
-        for src_type in ['jpg', 'png', 'gif', 'css', 'js']:
+        for src_type in ['jpg', 'png', 'gif', 'css', 'js', 'ico']:
             for url, filename, scr_type in self.get_source(src_type):
                 if self._save_file(url, filename, scr_type):
                     self.success_no += 1
@@ -76,7 +80,7 @@ class Spider(object):
         }
 
     def get_source(self, scr_type):
-        """根据指定的后缀，得到相应的静态资源列表      
+        """根据指定的后缀，得到相应的静态资源列表。    
         
         Args:
             scr_type (str): 爬取指定后缀的文件，如jpg，gif，css
@@ -88,7 +92,6 @@ class Spider(object):
             pattern = re.compile(r'\ssrc="([^"]*?\.{})"'.format(scr_type))
         files = pattern.findall(self.text)
         for url in set(files):
-            url = urlparse.urljoin(self.base_url, url)
             file_name = '{}.{}'.format(self.id, scr_type)
             self.id += 1
             yield url, file_name, scr_type
@@ -112,15 +115,18 @@ class Spider(object):
         Returns:
             bool: 文件是否被成功保存
         """
+        abs_url = urlparse.urljoin(self.base_url, url)
         try:
-            source = urlopen(url).read()
+            source = urlopen(abs_url).read()
         except (HTTPError, URLError) as e:
             print(e)
+            return False
+        except httplib.BadStatusLine:
             return False
         file = os.path.join(self.folder[file_type], file_name)
         with open(file, 'wb') as f:
             f.write(source)
-            self.text = self.text.replace(url, file)
+            self.text = self.text.replace(url, 'file:///{}'.format(file))
             print('{} ---> {}'.format(url, file))
         return True
 
