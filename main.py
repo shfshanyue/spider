@@ -14,8 +14,9 @@ from urllib2 import urlopen, HTTPError, URLError
 
 
 class Spider(object):
+
     """爬取一个网页，并保存在本地指定的路径
-    
+
     Attributes:
         base_path (str): 网页保存的路径，由参数-o指定
         save_path (str): 由爬取时间指定的路径
@@ -25,6 +26,7 @@ class Spider(object):
         id (int): 静态资源的编号
         text (str): 爬取网页的html代码
     """
+
     def __init__(self, url, save_path):
         try:
             self.text = urlopen(url).read()
@@ -33,36 +35,41 @@ class Spider(object):
         self.base_url = url
         self.save_path = save_path
 
-    def start(self):
-        """以当前时间为名创建文件夹，如果此文件夹已存在则删除该文件夹。并启动程序开始抓取网页资源。
-        
-        Returns:
-            dict: 成功下载的资源数，失败的资源数数以及失败的url列表
+    def ready(self):
+        """以当前时间为名创建文件夹，并且创建各个子文件夹
         """
-        self.id = 0
-        self.err_no = 0
-        self.success_no = 0
-        self.err_list = []
-        folder_name = '{:%y%m%d%H%M%S}'.format(datetime.datetime.now())
-        folder_name = os.path.join(self.save_path, folder_name)
+        folder_name = os.path.join(
+            self.save_path, '{:%y%m%d%H%M%S}'.format(datetime.datetime.now()))
         self.base_path = folder_name
-        try:
-            os.makedirs(folder_name)
-        except FileExistsError as e:
+        if os.path.exists(folder_name):
             shutil.rmtree(folder_name)
-            print('rmtree {} and remakedirs'.format(folder_name))
+        os.makedirs(folder_name)
         img_folder = os.path.join(folder_name, 'images')
+        css_folder = os.path.join(folder_name, 'style')
+        js_folder = os.path.join(folder_name, 'js')
         os.makedirs(img_folder)
-        os.makedirs(os.path.join(folder_name, 'style'))
-        os.makedirs(os.path.join(folder_name, 'js'))
+        os.makedirs(css_folder)
+        os.makedirs(js_folder)
         self.folder = {
             'jpg': img_folder,
             'png': img_folder,
             'gif': img_folder,
             'ico': img_folder,
-            'css': os.path.join(folder_name, 'style'),
-            'js': os.path.join(folder_name, 'js')
+            'css': css_folder,
+            'js': js_folder
         }
+
+    def start(self):
+        """并启动程序开始抓取网页资源。
+
+        Returns:
+            dict: 成功下载的资源数，失败的资源数数以及失败的url列表
+        """
+        self.ready()
+        self.id = 0
+        self.err_no = 0
+        self.success_no = 0
+        self.err_list = []
         for src_type in ['jpg', 'png', 'gif', 'css', 'js', 'ico']:
             for url, filename, scr_type in self.get_source(src_type):
                 if self._save_file(url, filename, scr_type):
@@ -81,10 +88,13 @@ class Spider(object):
 
     def get_source(self, scr_type):
         """根据指定的后缀，得到相应的静态资源列表。    
-        
+
         Args:
             scr_type (str): 爬取指定后缀的文件，如jpg，gif，css
-
+        Returns:
+            url(str): 静态文件的url
+            file_name(str): 在本地存储的文件名
+            scr_type(str): 静态文件的类型
         """
         if scr_type == 'css':
             pattern = re.compile(r'\shref="([^"]*?\.css)"')
@@ -106,12 +116,12 @@ class Spider(object):
 
     def _save_file(self, url, file_name, file_type):
         """保存文件，并替换html中相对于的静态资源地址
-        
+
         Args:
             url (str): 要抓取的静态资源地址
             file_name (str): 在本地需要保存的文件名
             file_type (str): 保存的文件类型，通过此判断应该位于哪个文件夹下
-        
+
         Returns:
             bool: 文件是否被成功保存
         """
@@ -141,6 +151,7 @@ if __name__ == '__main__':
     s = Spider(args.url, args.save_path)
     while True:
         info = s.start()
-        print('success {}, fail {}'.format(info['success'], info['error']['len']))
+        print('success {}, fail {}'.format(
+            info['success'], info['error']['len']))
         print('-'*64)
         time.sleep(int(args.interval))
