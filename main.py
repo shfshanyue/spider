@@ -9,6 +9,7 @@ import urlparse
 import shutil
 import httplib
 import time
+import urllib
 
 from urllib2 import urlopen, HTTPError, URLError
 
@@ -28,14 +29,10 @@ class Spider(object):
     """
 
     def __init__(self, url, save_path):
-        try:
-            self.text = urlopen(url).read()
-        except URLError as e:
-            print(e)
         self.base_url = url
         self.save_path = save_path
 
-    def ready(self):
+    def _mkdirs(self):
         """以当前时间为名创建文件夹，并且创建各个子文件夹
         """
         folder_name = os.path.join(
@@ -65,13 +62,14 @@ class Spider(object):
         Returns:
             dict: 成功下载的资源数，失败的资源数数以及失败的url列表
         """
-        self.ready()
         self.id = 0
         self.err_no = 0
         self.success_no = 0
         self.err_list = []
+        self.text = urlopen(self.base_url).read()
+        self._mkdirs()
         for src_type in ['jpg', 'png', 'gif', 'css', 'js', 'ico']:
-            for url, filename, scr_type in self.get_source(src_type):
+            for url, filename, scr_type in self._get_source(src_type):
                 if self._save_file(url, filename, scr_type):
                     self.success_no += 1
                 else:
@@ -86,7 +84,7 @@ class Spider(object):
             }
         }
 
-    def get_source(self, scr_type):
+    def _get_source(self, scr_type):
         """根据指定的后缀，得到相应的静态资源列表。    
 
         Args:
@@ -126,18 +124,10 @@ class Spider(object):
             bool: 文件是否被成功保存
         """
         abs_url = urlparse.urljoin(self.base_url, url)
-        try:
-            source = urlopen(abs_url).read()
-        except (HTTPError, URLError) as e:
-            print(e)
-            return False
-        except httplib.BadStatusLine:
-            return False
         file = os.path.join(self.folder[file_type], file_name)
-        with open(file, 'wb') as f:
-            f.write(source)
-            self.text = self.text.replace(url, 'file:///{}'.format(file))
-            print('{} ---> {}'.format(url, file))
+        urllib.urlretrieve(abs_url, file)
+        self.text = self.text.replace(url, 'file:///{}'.format(file))
+        print('{} ---> {}'.format(url, file))
         return True
 
 
